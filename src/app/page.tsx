@@ -1,103 +1,153 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useCallback } from 'react';
+import type { FC } from 'react';
+import Header from '@/components/layout/Header';
+import FileUploadForm from '@/components/docuflow/FileUploadForm';
+import ProcessingStatus from '@/components/docuflow/ProcessingStatus';
+import ExtractedDataDisplay from '@/components/docuflow/ExtractedDataDisplay';
+import type { ProcessingStep, ProcessingStepStatus } from '@/components/docuflow/types';
+import type { ExtractDataFromDocumentOutput } from '../ai/flows/extract-data-from-documents';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle } from "lucide-react";
+
+const initialSteps: ProcessingStep[] = [
+  { id: 'upload', name: 'Document Upload', status: 'pending', description: 'Select and upload your document for processing.' },
+  { id: 'extraction', name: 'AI Data Extraction', status: 'pending', description: 'AI is analyzing the document.' },
+  { id: 'transformation', name: 'Data Structuring', status: 'pending', description: 'Formatting extracted data for review.' },
+  { id: 'notification', name: 'Notifications', status: 'pending', description: 'Relevant parties will be alerted upon completion (simulated).' },
+  { id: 'complete', name: 'Process Complete', status: 'pending', description: 'The document workflow has finished.' },
+];
+
+
+const DocuFlowPage: FC = () => {
+  const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>(initialSteps);
+  const [extractedData, setExtractedData] = useState<Record<string, unknown> | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentDocumentName, setCurrentDocumentName] = useState<string | null>(null);
+
+  const updateStepStatus = useCallback((stepId: string, status: ProcessingStepStatus, details?: string) => {
+    setProcessingSteps(prevSteps =>
+      prevSteps.map(step =>
+        step.id === stepId ? { ...step, status, details: details || step.details } : step
+      )
+    );
+  }, []);
+  
+  const resetWorkflow = useCallback(() => {
+    setProcessingSteps(initialSteps);
+    setExtractedData(null);
+    setErrorMessage(null);
+    setCurrentDocumentName(null);
+  }, []);
+
+  const handleProcessStart = useCallback(() => {
+    resetWorkflow();
+    updateStepStatus('upload', 'in-progress', 'Preparing to upload document...');
+  }, [resetWorkflow, updateStepStatus]);
+
+  const simulateStepCompletion = useCallback(async (stepId: string, nextStepId?: string, delay: number = 700, details?: string) => {
+    updateStepStatus(stepId, 'completed', details);
+    if (nextStepId) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      updateStepStatus(nextStepId, 'in-progress');
+    }
+  }, [updateStepStatus]);
+
+
+  const handleProcessSuccess = useCallback(async (data: ExtractDataFromDocumentOutput, fileName: string) => {
+    setErrorMessage(null);
+    setCurrentDocumentName(fileName);
+    updateStepStatus('upload', 'completed', `Document "${fileName}" uploaded successfully.`);
+    
+    await new Promise(resolve => setTimeout(resolve, 300)); // Short delay
+    updateStepStatus('extraction', 'in-progress', 'Extracting data using AI...');
+
+    // Simulate AI processing time
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    setExtractedData(data.extractedData);
+    
+    const dataSummary = Object.keys(data.extractedData).length > 0 
+      ? `${Object.keys(data.extractedData).length} fields extracted.`
+      : 'No specific fields were extracted by AI, or the document might be empty/unreadable by the current model.';
+    
+    await simulateStepCompletion('extraction', 'transformation', 700, `AI processing complete. ${dataSummary}`);
+    await simulateStepCompletion('transformation', 'notification', 700, 'Data structured and validated.');
+    await simulateStepCompletion('notification', 'complete', 700, 'Stakeholders notified (simulation).');
+    updateStepStatus('complete', 'completed', 'Workflow finished successfully.');
+
+  }, [updateStepStatus, simulateStepCompletion]);
+
+  const handleProcessError = useCallback((error: string) => {
+    setErrorMessage(error);
+    // Find the current in-progress step and mark it as failed
+    setProcessingSteps(prevSteps => {
+      let failedStepFound = false;
+      return prevSteps.map(step => {
+        if (step.status === 'in-progress' && !failedStepFound) {
+          failedStepFound = true;
+          return { ...step, status: 'failed', details: error };
+        }
+        // If upload failed, mark it as failed
+        if(step.id === 'upload' && !failedStepFound) {
+           failedStepFound = true;
+           return { ...step, status: 'failed', details: error };
+        }
+        return step;
+      });
+    });
+     // If no specific step was in-progress (e.g. error before starting), mark upload as failed.
+    if (!processingSteps.some(s => s.status === 'failed')) {
+        updateStepStatus('upload', 'failed', error);
+    }
+  }, [updateStepStatus, processingSteps]);
+
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-grow container mx-auto px-4 py-8">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <FileUploadForm
+            onProcessStart={handleProcessStart}
+            onProcessSuccess={handleProcessSuccess}
+            onProcessError={handleProcessError}
+          />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          {errorMessage && (
+            <Alert variant="destructive" className="shadow-md">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+          
+          <ProcessingStatus steps={processingSteps} currentDocumentName={currentDocumentName} />
+          
+          {extractedData && Object.keys(extractedData).length > 0 && (
+            <ExtractedDataDisplay data={extractedData} />
+          )}
+          {extractedData && Object.keys(extractedData).length === 0 && processingSteps.find(s => s.id === 'extraction' && s.status === 'completed') && (
+             <Card className="w-full shadow-lg">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                        Extraction Result
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">The AI completed processing, but no specific data fields were returned. This could mean the document was empty, unreadable, or the content did not match patterns the AI is looking for. </p>
+                </CardContent>
+             </Card>
+          )}
+
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      <footer className="py-6 text-center text-sm text-muted-foreground">
+        © {new Date().getFullYear()} DocuFlow Automate. All rights reserved.
       </footer>
     </div>
   );
-}
+};
+
+export default DocuFlowPage;
