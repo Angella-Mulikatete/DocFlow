@@ -35,6 +35,8 @@ async function extractDataFromDocument(input: ExtractDataFromDocumentInput): Pro
   return extractDataFromDocumentFlow(input);
 }
 
+// const extractSpecificData = ai.defineTool({
+
 const extractSpecificData = ai.defineTool({
   name: 'extractSpecificData',
   description: 'Extracts specific data fields from a document.',
@@ -48,10 +50,49 @@ const extractSpecificData = ai.defineTool({
   }),
   outputSchema: ExtractedDataSchema,
 }, async (input) => {
-  // In a real application, this would contain the actual implementation for extracting data from the document.
-  // This is a placeholder implementation that returns an empty object.
+   console.log('>>> extractSpecificData tool received input.documentDataUri:', input.documentDataUri);
   console.log(`extractSpecificData called with fields: ${input.fields.join(', ')}`);
-  return {};
+
+  // --- Start modification: Extract contentType --- 
+  let contentType = '';
+  // Regex to capture the MIME type from the data URI
+  const match = input.documentDataUri.match(/^data:([a-zA-Z0-9\/\.\-+]+);base64,/);
+  if (match && match[1]) {
+    contentType = match[1];
+    console.log(`Extracted contentType: ${contentType}`);
+  } else {
+    // Handle error if MIME type cannot be extracted
+    console.error('Could not extract MIME type from documentDataUri. Ensure it follows "data:<mimetype>;base64,<data>" format.');
+    // Throw an error to stop processing if the format is invalid
+    throw new Error('Invalid documentDataUri format: Missing or invalid MIME type.');
+  }
+  // --- End modification --- 
+
+  const promptContent = `You are an expert data extractor. From the provided document, extract the following specific fields: ${input.fields.join(', ')}.\n  Return the extracted data as a JSON object where keys are the field names and values are the extracted data. If a field is not found, set its value to null.\n  Do not include any other text or formatting, only the JSON object.`;
+
+  const response = await ai.generate({
+    model: 'googleai/gemini-1.5-flash', // Corrected model name based on common usage, verify if needed
+    prompt: [
+      { text: promptContent },
+      // --- Pass both url and contentType --- 
+      { media: { url: input.documentDataUri, contentType: contentType } }
+    ],
+    output: { format: 'json' },
+  });
+
+  try {
+    // Add a check for empty response text
+    if (!response.text) {
+        console.error("AI response text is empty.");
+        return {}; // Return empty object or handle as appropriate
+    }
+    const extractedData = JSON.parse(response.text);
+    return extractedData;
+  } catch (e) {
+    // Log the actual text that failed to parse
+    console.error("Failed to parse AI response as JSON:", response.text, e);
+    return {}; // Return empty object or handle error appropriately
+  }
 });
 
 const extractDataFromDocumentPrompt = ai.definePrompt({
@@ -76,7 +117,9 @@ const extractDataFromDocumentFlow = ai.defineFlow(
     inputSchema: ExtractDataFromDocumentInputSchema,
     outputSchema: ExtractDataFromDocumentOutputSchema,
   },
-  async input => {
+ async input => {
+    // <<< Add this log >>>
+    console.log('>>> extractDataFromDocumentFlow received input.documentDataUri:', input.documentDataUri);
     const {output} = await extractDataFromDocumentPrompt(input);
     return output!;
   }

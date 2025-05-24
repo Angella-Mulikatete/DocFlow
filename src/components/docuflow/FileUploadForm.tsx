@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ChangeEvent, FC, FormEvent } from 'react';
@@ -6,19 +7,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { extractDataFromDocument, type ExtractDataFromDocumentInput, type ExtractDataFromDocumentOutput } from "../../ai/flows/extract-data-from-documents";
+//import { extractDataFromDocument, type ExtractDataFromDocumentInput, type ExtractDataFromDocumentOutput } from "../../ai/flows/extract-data-from-documents";
 import { toast } from 'sonner';
 import { Loader2, FileUp } from 'lucide-react';
 
+
 interface FileUploadFormProps {
   onProcessStart: () => void;
-  onProcessSuccess: (data: ExtractDataFromDocumentOutput, fileName: string) => void;
+   onProcessSuccess: (runId: string, fileName: string) => void;
   onProcessError: (error: string) => void;
 }
 
 const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSuccess, onProcessError }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+      // Cloudinary constants are no longer needed as file is sent as data URI directly to Inngest
+      // const CLOUDINARY_UPLOAD_PRESET = "note-book-companion";
+      // const CLOUDINARY_CLOUD_NAME = "dcmjg2lmc";
+      // const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
+      // const CLOUDINARY_UPLOAD_URL = "cloudinary://521165744352871:BekIshV3n2oZF18kP6t-iFbdhbA@dcmjg2lmc"
+      // const apiKey = "521165744352871";
+      // const apiSecret = "BekIshV3n2oZF18kP6t-iFbdhbA";
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -50,36 +60,49 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
     onProcessStart();
 
     try {
+      // 1. Convert selectedFile to a data URI (base64)
       const reader = new FileReader();
-      reader.onloadend = async () => {
-        const documentDataUri = reader.result as string;
-        const input: ExtractDataFromDocumentInput = {
-          documentDataUri,
-          description: `Document: ${selectedFile.name}`, // Optional: provide a description
+      const documentDataUriPromise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Failed to read file as data URL.'));
+          }
         };
-        
-        const output = await extractDataFromDocument(input);
-        onProcessSuccess(output, selectedFile.name);
-        toast.success('Processing Successful', {
-          description: `Data extracted from ${selectedFile.name}.`,
-        });
-        setSelectedFile(null); // Reset file input after successful upload
-        const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-        if (fileInput) {
-            fileInput.value = '';
-        }
-      };
-      reader.onerror = () => {
-        throw new Error('Error reading file.');
-      };
-      reader.readAsDataURL(selectedFile);
-    } catch (error) {
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedFile);
+      });
+
+      const documentDataUri = await documentDataUriPromise;
+
+      // 2. Send event to Inngest via API route
+      const inngestResponse = await fetch("/api/trigger-extraction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentDataUri,
+          description: `Document: ${selectedFile.name}`, // description is used here
+          fileName: selectedFile.name, // fileName is used here
+        }),
+      });
+
+      if (!inngestResponse.ok) {
+        throw new Error(`Failed to trigger extraction: ${inngestResponse.statusText}`);
+      }
+
+      const { runId } = await inngestResponse.json();
+      console.log('Inngest run ID in fileUpload Component:', runId);
+      onProcessSuccess(runId, selectedFile.name);
+      setSelectedFile(null);
+
+    }catch (error) {
       console.error('Error processing document:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       onProcessError(errorMessage);
       toast.error('Processing Failed', {
         description: errorMessage,
-      });
+       });
     } finally {
       setIsLoading(false);
     }
