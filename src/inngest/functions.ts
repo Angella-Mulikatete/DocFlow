@@ -1,32 +1,30 @@
 import { inngest } from "./client";
 
 import { extractDataFromDocument } from "../ai/flows/extract-data-from-documents";
+import { updateJobResult } from "../app/api/check-result/[id]/route";
 
 export const extractDocumentDataJob = inngest.createFunction(
   { id: "extract-document-data" },
   { event: "document.uploaded" },
   async ({ event, step }) => {
     // event.data will contain documentDataUri, description, fileName, etc.
-    const { documentDataUri, description } = event.data;
-    // Use step.fetch to fetch the document
-    // const response = await step.fetch( documentDataUri, {
-    //   method: "GET",
-    // });
+    const { documentDataUri,contentType, description,runId } = event.data;
 
-    // console.log("Response.string object in functions file:", response.toString());
-    // console.log("Response object in functions file:", response);
-    // console.log("Response array buffers in functions file:", response.arrayBuffer());
-    // const arrayBuffer = await response.arrayBuffer();
-    // const buffer = Buffer.from(arrayBuffer);
+     // Mark job as started
+    updateJobResult(runId, 'pending');
 
     //handling retries
     const output = await step.run("Extract Data", async () => {
-      return await extractDataFromDocument({ documentDataUri, description });
+      return await extractDataFromDocument({
+        documentDataUri,
+        description,
+        contentType
+      });
     });
-      console.log("Extracted data:", output.extractedData.toString());
+      console.log("Extracted data from inngest in the extractDocumentDataHob function:", {output});
+      // Store the successful result
+      updateJobResult(runId, 'completed', output);
     return output;
-  
-
   }
 );
 

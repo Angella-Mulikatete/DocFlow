@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback ,useRef} from 'react';
 import type { FC } from 'react';
 import Header from '@/components/layout/Header';
 import FileUploadForm from '@/components/docuflow/FileUploadForm';
@@ -29,6 +29,82 @@ const DocuFlowPage: FC = () => {
   const [currentDocumentName, setCurrentDocumentName] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
+  // const updateStepStatus = useCallback((stepId: string, status: ProcessingStepStatus, details?: string) => {
+  //   setProcessingSteps(prevSteps =>
+  //     prevSteps.map(step =>
+  //       step.id === stepId ? { ...step, status, details: details || step.details } : step
+  //     )
+  //   );
+  // }, []);
+  
+  // const resetWorkflow = useCallback(() => {
+  //   setProcessingSteps(initialSteps);
+  //   setExtractedData(null);
+  //   setErrorMessage(null);
+  //   setCurrentDocumentName(null);
+  //   setIsProcessing(false);
+  // }, []);
+
+  // const handleProcessStart = useCallback(() => {
+  //   resetWorkflow();
+  //   setIsProcessing(true);
+  //   updateStepStatus('upload', 'in-progress', 'Preparing to upload document...');
+  // }, [resetWorkflow, updateStepStatus]);
+
+  // const handleProcessSuccess = useCallback(async (documentDataUri: string, fileName: string, description?: string, contentType?: string) => {
+  //   try {
+  //     setCurrentDocumentName(fileName);
+  //     updateStepStatus('upload', 'completed', `Document "${fileName}" uploaded successfully.`);
+  //     updateStepStatus('extraction', 'in-progress', 'AI is analyzing the document...');
+
+  //     // Call your extraction API directly - no Inngest complexity
+  //     const response = await fetch('/api/extract', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //         documentDataUri,
+  //         description: description || 'Extract all relevant data from this document',
+  //         contentType,
+  //         fileName
+  //       }),
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error(`Extraction failed: ${response.statusText}`);
+  //     }
+
+  //     const result = await response.json();
+
+  //     console.log("Extracted data from the extract endpoint:", result);
+      
+  //     // Handle the result
+  //     const extractedData = result.extractedData || {};
+  //     setExtractedData(extractedData);
+
+  //     console.log('Extracted data in pages from the extract endpoint:', extractedData);
+      
+  //     const dataSummary = Object.keys(extractedData).length > 0
+  //       ? `${Object.keys(extractedData).length} fields extracted.`
+  //       : 'No specific fields were extracted by AI.';
+
+  //     updateStepStatus('extraction', 'completed', `AI processing complete. ${dataSummary}`);
+  //     updateStepStatus('transformation', 'completed', 'Data structured and validated.');
+  //     updateStepStatus('notification', 'completed', 'Stakeholders notified (simulation).');
+  //     updateStepStatus('complete', 'completed', 'Workflow finished successfully.');
+  //     setIsProcessing(false);
+
+  //   } catch (error) {
+  //     console.error('Processing error:', error);
+  //     handleProcessError(error instanceof Error ? error.message : 'Unknown error occurred');
+  //   }
+  // }, [updateStepStatus]);
+
+ 
+ 
+   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const updateStepStatus = useCallback((stepId: string, status: ProcessingStepStatus, details?: string) => {
     setProcessingSteps(prevSteps =>
       prevSteps.map(step =>
@@ -38,6 +114,12 @@ const DocuFlowPage: FC = () => {
   }, []);
   
   const resetWorkflow = useCallback(() => {
+    // Clear any existing polling
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
     setProcessingSteps(initialSteps);
     setExtractedData(null);
     setErrorMessage(null);
@@ -51,14 +133,87 @@ const DocuFlowPage: FC = () => {
     updateStepStatus('upload', 'in-progress', 'Preparing to upload document...');
   }, [resetWorkflow, updateStepStatus]);
 
-  const handleProcessSuccess = useCallback(async (documentDataUri: string, fileName: string, description?: string) => {
+  const pollJobStatus = useCallback(async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/check-result/${jobId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to check job status: ${response.statusText}`);
+      }
+      
+      const jobResult = await response.json();
+      console.log('Job status:', jobResult);
+      
+      switch (jobResult.status) {
+        case 'processing':
+          updateStepStatus('extraction', 'in-progress', 'AI is actively processing the document...');
+          break;
+          
+        case 'completed':
+          // Clear the polling interval
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          // Extract the data from the job result
+          const output = jobResult.data;
+          console.log("Complete job output:", output);
+          
+          // Handle your specific output structure
+          const extractedData = output?.extractedData || {};
+          setExtractedData(extractedData);
+          
+          console.log('Final extracted data:', extractedData);
+          
+          const dataSummary = Object.keys(extractedData).length > 0
+            ? `${Object.keys(extractedData).length} fields extracted.`
+            : 'No specific fields were extracted by AI.';
+
+          updateStepStatus('extraction', 'completed', `AI processing complete. ${dataSummary}`);
+          updateStepStatus('transformation', 'completed', 'Data structured and validated.');
+          updateStepStatus('notification', 'completed', 'Stakeholders notified (simulation).');
+          updateStepStatus('complete', 'completed', 'Workflow finished successfully.');
+          setIsProcessing(false);
+          break;
+          
+        case 'failed':
+          // Clear the polling interval
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          throw new Error(jobResult.error || 'Job failed without specific error message');
+          
+        case 'pending':
+          // Keep polling
+          break;
+          
+        default:
+          console.warn('Unknown job status:', jobResult.status);
+      }
+    } catch (error) {
+      console.error('Polling error:', error);
+      
+      // Clear the polling interval
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      
+      handleProcessError(error instanceof Error ? error.message : 'Unknown polling error');
+    }
+  }, [updateStepStatus]);
+
+  const handleProcessSuccess = useCallback(async (documentDataUri: string, fileName: string, description?: string, contentType?: string) => {
     try {
       setCurrentDocumentName(fileName);
       updateStepStatus('upload', 'completed', `Document "${fileName}" uploaded successfully.`);
-      updateStepStatus('extraction', 'in-progress', 'AI is analyzing the document...');
+      updateStepStatus('extraction', 'in-progress', 'Triggering AI extraction...');
 
-      // Call your extraction API directly - no Inngest complexity
-      const response = await fetch('/api/extract', {
+      // Trigger the Inngest job
+      const response = await fetch('/api/trigger-extraction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,38 +221,37 @@ const DocuFlowPage: FC = () => {
         body: JSON.stringify({
           documentDataUri,
           description: description || 'Extract all relevant data from this document',
+          contentType,
           fileName
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Extraction failed: ${response.statusText}`);
+        throw new Error(`Failed to trigger extraction: ${response.statusText}`);
       }
 
       const result = await response.json();
+      const jobId = result.runId;
       
-      // Handle the result
-      const extractedData = result.extractedData || {};
-      setExtractedData(extractedData);
+      console.log('Extraction job started with ID:', jobId);
+      updateStepStatus('extraction', 'in-progress', 'AI extraction job queued. Waiting for processing...');
 
-      console.log('Extracted data in pages:', extractedData);
-      
-      const dataSummary = Object.keys(extractedData).length > 0
-        ? `${Object.keys(extractedData).length} fields extracted.`
-        : 'No specific fields were extracted by AI.';
+      // Start polling for job status
+      pollingIntervalRef.current = setInterval(() => {
+        pollJobStatus(jobId);
+      }, 2000); // Poll every 2 seconds
 
-      updateStepStatus('extraction', 'completed', `AI processing complete. ${dataSummary}`);
-      updateStepStatus('transformation', 'completed', 'Data structured and validated.');
-      updateStepStatus('notification', 'completed', 'Stakeholders notified (simulation).');
-      updateStepStatus('complete', 'completed', 'Workflow finished successfully.');
-      setIsProcessing(false);
+      // Also poll immediately
+      pollJobStatus(jobId);
 
     } catch (error) {
       console.error('Processing error:', error);
       handleProcessError(error instanceof Error ? error.message : 'Unknown error occurred');
     }
-  }, [updateStepStatus]);
-
+  }, [updateStepStatus, pollJobStatus]);
+ 
+ 
+ 
   const handleProcessError = useCallback((error: string) => {
     setErrorMessage(error);
     setIsProcessing(false);

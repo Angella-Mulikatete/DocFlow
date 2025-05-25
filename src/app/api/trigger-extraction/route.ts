@@ -5,10 +5,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { documentDataUri, description, fileName } = await request.json();
+    const { documentDataUri, description,contentType, fileName } = await request.json();
+
+    
     const result = await inngest.send({
       name: "document.uploaded",
-      data: { documentDataUri, description, fileName }
+      data: { documentDataUri, description,contentType, fileName }
     });
 
      console.log('Inngest result from the api:', result);

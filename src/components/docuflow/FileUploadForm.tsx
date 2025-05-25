@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 'use client';
 
@@ -14,7 +15,7 @@ import { Loader2, FileUp } from 'lucide-react';
 
 interface FileUploadFormProps {
   onProcessStart: () => void;
-   onProcessSuccess: (runId: string, fileName: string) => void;
+  onProcessSuccess: (runId: string, fileName: string) => void;
   onProcessError: (error: string) => void;
 }
 
@@ -23,12 +24,10 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
   const [isLoading, setIsLoading] = useState(false);
 
       // Cloudinary constants are no longer needed as file is sent as data URI directly to Inngest
-      // const CLOUDINARY_UPLOAD_PRESET = "note-book-companion";
-      // const CLOUDINARY_CLOUD_NAME = "dcmjg2lmc";
-      // const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
-      // const CLOUDINARY_UPLOAD_URL = "cloudinary://521165744352871:BekIshV3n2oZF18kP6t-iFbdhbA@dcmjg2lmc"
-      // const apiKey = "521165744352871";
-      // const apiSecret = "BekIshV3n2oZF18kP6t-iFbdhbA";
+  // const CLOUDINARY_UPLOAD_PRESET = "note-book-companion";
+  // const CLOUDINARY_CLOUD_NAME = "dcmjg2lmc";
+
+
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -46,6 +45,85 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
       setSelectedFile(file);
     }
   };
+
+//   async function uploadFileToCloudinary(file: File): Promise<string> {
+//     const formData = new FormData();
+//     formData.append("file", file);
+//     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+//     const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
+//     const response = await fetch(uploadUrl, {
+//       method: "POST",
+//       body: formData,
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+//     }
+
+//     const data = await response.json();
+//     return data.secure_url as string;
+//  }
+
+  const getFileType = (fileName: string) => {
+        const extension = fileName.split('.').pop()?.toLowerCase() || '';
+        switch (extension) {
+          case 'pdf':
+            return "pdf";
+          case 'txt':
+            return "txt";
+          case 'doc':
+          case 'docx':
+            return "gdoc"; 
+          default:
+            return "txt"; 
+        }
+  };
+
+//   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+//     event.preventDefault();
+//     if (!selectedFile) {
+//       toast.error('No File Selected', {
+//         description: 'Please select a document to upload.',
+//       });
+//       return;
+//     }
+
+//     setIsLoading(true);
+//     onProcessStart();
+
+//     try {
+//       // 1. Upload the file to Cloudinary and get the URL
+//       const fileUrl = await uploadFileToCloudinary(selectedFile);
+
+//       // 2. Send event to Inngest via API route
+//       const inngestResponse = await fetch("/api/trigger-extraction", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({
+//           documentDataUri: fileUrl, // Use the Cloudinary URL
+//           description: `Document: ${selectedFile.name}`,
+//           contentType: selectedFile.type,
+//           fileName: selectedFile.name,
+//         }),
+//       });
+
+//       if (!inngestResponse.ok) {
+//         throw new Error(`Failed to trigger extraction: ${inngestResponse.statusText}`);
+//       }
+
+//       const { runId } = await inngestResponse.json();
+//       onProcessSuccess(runId, selectedFile.name);
+//       setSelectedFile(null);
+
+//     } catch (error) {
+//       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+//       onProcessError(errorMessage);
+//       toast.error('Processing Failed', { description: errorMessage });
+//     } finally {
+//       setIsLoading(false);
+//     }
+//  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,6 +153,7 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
       });
 
       const documentDataUri = await documentDataUriPromise;
+      //console.log('Document Data URI in file Upload form componenet:', documentDataUri);
 
       // 2. Send event to Inngest via API route
       const inngestResponse = await fetch("/api/trigger-extraction", {
@@ -82,8 +161,9 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentDataUri,
-          description: `Document: ${selectedFile.name}`, // description is used here
-          fileName: selectedFile.name, // fileName is used here
+          description: `Document: ${selectedFile.name}`,
+          contentType: selectedFile.type,
+          fileName: selectedFile.name,
         }),
       });
 
@@ -107,6 +187,7 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
       setIsLoading(false);
     }
   };
+
 
   return (
     <Card className="w-full shadow-lg">
