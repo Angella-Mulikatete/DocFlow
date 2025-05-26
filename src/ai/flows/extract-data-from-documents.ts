@@ -58,10 +58,10 @@ const extractSpecificData = ai.defineTool(
 
   const promptContent = `You are an expert data extractor. From the provided document, extract the following specific fields: ${input.fields.join(', ')}.\n  Return the extracted data as a JSON object where keys are the field names and values are the extracted data. If a field is not found, set its value to null.\n  Do not include any other text or formatting, only the JSON object.`;
   const response = await ai.generate({
-    model: 'googleai/gemini-1.5-flash', // Corrected model name based on common usage, verify if needed
+    model: 'googleai/gemini-1.5-flash', 
     prompt: [
       { text: promptContent },
-      // --- Pass both url and contentType --- 
+      //Pass both url and contentType 
       { media: { url: input.documentDataUri, contentType: input.contentType } }
     ],
     output: { format: 'json' },
@@ -118,7 +118,6 @@ const extractDataFromDocumentFlow = ai.defineFlow(
       effectiveContentType = dataUriMatch[1];
       console.log(`Extracted contentType from data URI: ${effectiveContentType}`);
     } else if (input.documentDataUri.startsWith('http' )) {
-      // It looks like a URL, use the contentType passed in the input
       if (input.contentType) {
         effectiveContentType = input.contentType;
         console.log(`Using provided contentType for URL: ${effectiveContentType}`);
@@ -132,9 +131,6 @@ const extractDataFromDocumentFlow = ai.defineFlow(
       console.error('Error: Invalid documentDataUri format. Must be a data URI or a public URL.');
       throw new Error('Invalid documentDataUri format.');
     }
-
-    // Now call the prompt, ensuring the effectiveContentType is passed
-    // The prompt itself expects 'contentType' in its input based on your schema
     
     //console.log('>>> Calling Prompt with input:', JSON.stringify({ ...input, contentType: effectiveContentType }, null, 2));
     const { output } = await extractDataFromDocumentPrompt({ ...input, contentType: effectiveContentType });

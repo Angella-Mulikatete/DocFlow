@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-//import { extractDataFromDocument, type ExtractDataFromDocumentInput, type ExtractDataFromDocumentOutput } from "../../ai/flows/extract-data-from-documents";
 import { toast } from 'sonner';
 import { Loader2, FileUp } from 'lucide-react';
 
@@ -23,11 +22,6 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-      // Cloudinary constants are no longer needed as file is sent as data URI directly to Inngest
-  // const CLOUDINARY_UPLOAD_PRESET = "note-book-companion";
-  // const CLOUDINARY_CLOUD_NAME = "dcmjg2lmc";
-
-
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -39,31 +33,12 @@ const FileUploadForm: FC<FileUploadFormProps> = ({ onProcessStart, onProcessSucc
           description: 'Please upload a PDF, JPG, PNG, TIFF or WEBP file.',
         });
         setSelectedFile(null);
-        event.target.value = ''; // Reset file input
+        event.target.value = '';
         return;
       }
       setSelectedFile(file);
     }
   };
-
-//   async function uploadFileToCloudinary(file: File): Promise<string> {
-//     const formData = new FormData();
-//     formData.append("file", file);
-//     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-//     const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
-//     const response = await fetch(uploadUrl, {
-//       method: "POST",
-//       body: formData,
-//     });
-
-//     if (!response.ok) {
-//       throw new Error(`Cloudinary upload failed: ${response.statusText}`);
-//     }
-
-//     const data = await response.json();
-//     return data.secure_url as string;
-//  }
 
   const getFileType = (fileName: string) => {
         const extension = fileName.split('.').pop()?.toLowerCase() || '';

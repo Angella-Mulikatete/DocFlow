@@ -28,7 +28,7 @@ const StatusIcon: FC<{ status: ProcessingStepStatus }> = ({ status }) => {
 
 const ProcessingStatus: FC<ProcessingStatusProps> = ({ steps, currentDocumentName }) => {
   if (!steps || steps.length === 0 || steps.every(step => step.status === 'pending' && !step.details)) {
-    return null; // Don't render if no steps are active or no document is being processed
+    return null;
   }
 
   return (

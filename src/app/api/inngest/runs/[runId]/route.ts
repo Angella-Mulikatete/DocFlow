@@ -37,9 +37,9 @@ export async function GET(
     
     // Transform the response to match your expected format
     const response = {
-      status: runData.status, // 'Running', 'Completed', 'Failed', etc.
-      output: runData.output, // The return value from your function
-      error: runData.error,   // Error details if failed
+      status: runData.status, 
+      output: runData.output,
+      error: runData.error,   
       createdAt: runData.created_at,
       finishedAt: runData.finished_at,
     };

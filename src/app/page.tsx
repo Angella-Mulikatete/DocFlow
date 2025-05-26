@@ -250,8 +250,7 @@ const DocuFlowPage: FC = () => {
     }
   }, [updateStepStatus, pollJobStatus]);
  
- 
- 
+
   const handleProcessError = useCallback((error: string) => {
     setErrorMessage(error);
     setIsProcessing(false);
@@ -259,7 +258,6 @@ const DocuFlowPage: FC = () => {
     setProcessingSteps(prevSteps => {
       const failedStep = prevSteps.find(step => step.status === 'in-progress') || 
                          prevSteps.find(step => step.id === 'upload');
-      
       return prevSteps.map(step =>
         step.id === failedStep?.id 
           ? { ...step, status: 'failed' as ProcessingStepStatus, details: error }

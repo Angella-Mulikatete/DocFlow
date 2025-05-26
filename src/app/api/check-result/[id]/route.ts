@@ -1,8 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-// You'll need to store job results somewhere (database, Redis, etc.)
-// This is a simplified example using in-memory storage
 const jobResults = new Map<string, { status: 'pending' | 'completed' | 'failed', data?: unknown, error?: string }>();
 
 export async function GET(
@@ -22,7 +20,7 @@ export async function GET(
   return NextResponse.json(result);
 }
 
-// Helper function to update job status (call this from your Inngest job)
+
 export function updateJobResult(runId: string, status: 'pending' | 'completed' | 'failed', data?: unknown, error?: string) {
   jobResults.set(runId, { status, data, error });
 }
