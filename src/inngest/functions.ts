@@ -1,7 +1,7 @@
 import { inngest } from "./client";
 
 import { extractDataFromDocument } from "../ai/flows/extract-data-from-documents";
-import { updateJobResult } from "../app/api/check-result/[id]/route";
+import { updateJobResult } from "../lib/jobResults";
 
 export const extractDocumentDataJob = inngest.createFunction(
   { id: "extract-document-data" },
