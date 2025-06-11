@@ -133,6 +133,21 @@ const DocuFlowPage: FC = () => {
     updateStepStatus('upload', 'in-progress', 'Preparing to upload document...');
   }, [resetWorkflow, updateStepStatus]);
 
+  const handleProcessError = useCallback((error: string) => {
+    setErrorMessage(error);
+    setIsProcessing(false);
+    
+    setProcessingSteps(prevSteps => {
+      const failedStep = prevSteps.find(step => step.status === 'in-progress') || 
+                         prevSteps.find(step => step.id === 'upload');
+      return prevSteps.map(step =>
+        step.id === failedStep?.id 
+          ? { ...step, status: 'failed' as ProcessingStepStatus, details: error }
+          : step
+      );
+    });
+  }, []);
+
   const pollJobStatus = useCallback(async (jobId: string) => {
     try {
       const response = await fetch(`/api/check-result/${jobId}`);
@@ -204,7 +219,7 @@ const DocuFlowPage: FC = () => {
       
       handleProcessError(error instanceof Error ? error.message : 'Unknown polling error');
     }
-  }, [updateStepStatus]);
+  }, [updateStepStatus, handleProcessError]);
 
   const handleProcessSuccess = useCallback(async (documentDataUri: string, fileName: string, description?: string, contentType?: string) => {
     try {
@@ -248,23 +263,8 @@ const DocuFlowPage: FC = () => {
       console.error('Processing error:', error);
       handleProcessError(error instanceof Error ? error.message : 'Unknown error occurred');
     }
-  }, [updateStepStatus, pollJobStatus]);
+  }, [updateStepStatus, pollJobStatus, handleProcessError]);
  
-
-  const handleProcessError = useCallback((error: string) => {
-    setErrorMessage(error);
-    setIsProcessing(false);
-    
-    setProcessingSteps(prevSteps => {
-      const failedStep = prevSteps.find(step => step.status === 'in-progress') || 
-                         prevSteps.find(step => step.id === 'upload');
-      return prevSteps.map(step =>
-        step.id === failedStep?.id 
-          ? { ...step, status: 'failed' as ProcessingStepStatus, details: error }
-          : step
-      );
-    });
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -552,18 +552,3 @@ export default DocuFlowPage;
 // };
 
 // export default DocuFlowPage;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
